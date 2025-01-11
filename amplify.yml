@@ -5,23 +5,26 @@ applications:
       phases:
         preBuild:
           commands:
-            - npm install --quiet --global expo-cli
-            - >
-              if [ -f yarn.lock ]; then
-                yarn
-              elif [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
-                npm ci
-              else
-                npm install
-              fi
+            # 1) Ensure Node 16 is used
+            - nvm install 16
+            - nvm use 16
+
+            # 2) Install dependencies in dungeonbox-web
+            #    (npm ci if you have a package-lock, else npm install)
+            - if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
         build:
           commands:
-            - expo build:web
+            # 3) Run Metro web export, which defaults to outputting 'dist/'
+            - npx expo export --platform web
+
       artifacts:
-        baseDirectory: web-build
+        # 4) Host static files from the 'dist' folder
+        baseDirectory: dist
         files:
           - '**/*'
+
       cache:
+        # 5) Cache node_modules for faster subsequent builds
         paths:
           - node_modules/**/*
-          - $(npm root --global)/**/*
