@@ -5,26 +5,35 @@ applications:
       phases:
         preBuild:
           commands:
-            # 1) Ensure Node 16 is used
-            - nvm install 16
-            - nvm use 16
+            # 1) Use Node 18 so that Web Streams APIs (ReadableStream) are available
+            - nvm install 18
+            - nvm use 18
 
-            # 2) Install dependencies in dungeonbox-web
-            #    (npm ci if you have a package-lock, else npm install)
-            - if [ -f package-lock.json ]; then npm ci; else npm install; fi
+            # 2) Install the new local Expo CLI (as a dev dependency), if not done yet
+            #    You can do this once in your project:
+            #       cd dungeonbox-web
+            #       npm install --save-dev @expo/cli
+            #    or you could install it globally -- but local is recommended
+            #    For demonstration, we'll assume it's already in package.json.
+
+            # 3) Install your project dependencies
+            #    We'll assume you have a package-lock.json. Otherwise, fallback to npm install.
+            - npm ci || npm install
 
         build:
           commands:
-            # 3) Run Metro web export, which defaults to outputting 'dist/'
+            # 4) Use the new local Expo CLI to export a Metro-based web build
+            #    This outputs to `dist/` by default
             - npx expo export --platform web
 
       artifacts:
-        # 4) Host static files from the 'dist' folder
+        # 5) Amplify will deploy all files from `dist/`
         baseDirectory: dist
         files:
           - '**/*'
 
       cache:
-        # 5) Cache node_modules for faster subsequent builds
+        # 6) Cache node_modules for faster subsequent builds
         paths:
           - node_modules/**/*
+
