@@ -193,7 +193,7 @@ export default function App() {
 
       // Write this player into the players list
       const playerData = {
-        playerId,            
+        playerId,
         playerName: tempPlayerName,
         score: 0,
         hasVoted: false,
@@ -309,9 +309,6 @@ export default function App() {
           </View>
         ) : (
           <View style={{ flex: 1 }}>
-            {/* Don't show room code once joined */}
-            <Text style={styles.header}>State: {currentGameState}</Text>
-
             {currentGameState === GameState.Lobby && (
               <View>
                 <Text>Waiting in the lobby...</Text>
@@ -347,15 +344,20 @@ export default function App() {
                 <FlatList
                   data={answers}
                   keyExtractor={(item) => item.id}
-                  renderItem={({ item }) => (
-                    <View style={styles.answerItem}>
-                      <Text>{item.content}</Text>
-                      <Button
-                        title="Vote"
-                        onPress={() => voteOnAnswer(item.id)}
-                      />
-                    </View>
-                  )}
+                  renderItem={({ item }) => {
+                    const isMyAnswer = item.playerId === playerId;
+                    return (
+                      <View style={styles.answerItem}>
+                        <Text>{item.content}</Text>
+                        {!isMyAnswer && (
+                          <Button
+                            title="Vote"
+                            onPress={() => voteOnAnswer(item.id)}
+                          />
+                        )}
+                      </View>
+                    );
+                  }}
                 />
               </View>
             )}
