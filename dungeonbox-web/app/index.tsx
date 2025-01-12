@@ -238,6 +238,7 @@ export default function App() {
       playerId,
       content: answerText.trim(),
       votes: 0,
+      playerName: tempPlayerName
     };
     await set(ref(db, `games/${roomCode}/answers/${newKey}`), answerData);
     setAnswerText('');
