@@ -4,8 +4,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-
-// Firebase imports
 using Firebase;
 using Firebase.Database;
 using Firebase.Extensions;
@@ -23,16 +21,13 @@ public enum GameState
 
 public class GameManager : MonoBehaviour
 {
-    [Header("UI References")]
-    [SerializeField] private GameObject mainMenuPanel;
-    [SerializeField] private GameObject lobbyPanel;
-    [SerializeField] private GameObject gameplayPanel;
-    [SerializeField] private GameObject votingPanel;
-    [SerializeField] private GameObject resultsPanel;
+    [Header("UI References (Individual Objects)")]
+    [SerializeField] private GameObject titleLogo;
+    [SerializeField] private GameObject playButton;
     [SerializeField] private TMP_Text gameCodeText;
     [SerializeField] private TMP_Text promptText;
     [SerializeField] private TMP_Text timerText;
-    [SerializeField] private RawImage qrCodeImage;
+    [SerializeField] private Image qrCodeImage;
     [SerializeField] private GridLayoutGroup playerGrid;
     [SerializeField] private PlayerSlot[] playerSlots;
 
@@ -50,8 +45,9 @@ public class GameManager : MonoBehaviour
 
     private void Start()
     {
-        // Get AWSInteractor on this same GameObject (or adjust as needed)
+        // Grab AWSInteractor on this same GameObject (adjust as needed)
         awsInteractor = GetComponent<AWSInteractor>();
+        SetInitialUI();
         if (!awsInteractor)
         {
             Debug.LogError("AWSInteractor component not found on the same GameObject!");
@@ -76,22 +72,20 @@ public class GameManager : MonoBehaviour
     private void InitializeFirebase()
     {
         dbRootRef = FirebaseDatabase.DefaultInstance.RootReference;
+        playButton.SetActive(true);
     }
 
     public void OnPlayButtonClicked()
     {
-        // Reset sessionId to empty
-        if (awsInteractor != null)
-        {
-            awsInteractor.sessionId = "";
-            awsInteractor.SendMessageToServer("Start Game");
-        }
+        // Reset sessionId to empty and send "Start Game" to AI
+        awsInteractor.sessionId = "";
+        awsInteractor.SendMessageToServer("Start Game");
 
         CreateGameSession();
     }
 
     /// <summary>
-    /// Creates a new game session in Firebase, initializes a code, sets lobby state.
+    /// Creates a new game session in Firebase, initializes a code, sets Lobby state.
     /// </summary>
     private async void CreateGameSession()
     {
@@ -100,7 +94,6 @@ public class GameManager : MonoBehaviour
             gameCode = GenerateGameCode();
             gameCodeText.text = gameCode;
 
-            // Create a game node in Firebase Realtime Database
             var newGameData = new Dictionary<string, object>
             {
                 { "gameCode", gameCode },
@@ -127,7 +120,7 @@ public class GameManager : MonoBehaviour
 
     /// <summary>
     /// Sets up a single listener for the entire game data at /games/{gameCode}.
-    /// We can parse state, players, and answers from this snapshot.
+    /// We parse state, players, answers, etc. whenever this data changes.
     /// </summary>
     private void SetupRealtimeListeners(string code)
     {
@@ -137,10 +130,6 @@ public class GameManager : MonoBehaviour
             .ValueChanged += HandleGameDataChanged;
     }
 
-    /// <summary>
-    /// This method is triggered any time the /games/{gameCode} data changes.
-    /// We parse the entire game object, updating local state, players, and answers.
-    /// </summary>
     private void HandleGameDataChanged(object sender, ValueChangedEventArgs args)
     {
         if (args.Snapshot == null || args.Snapshot.Value == null) return;
@@ -148,13 +137,12 @@ public class GameManager : MonoBehaviour
         var gameData = args.Snapshot.Value as Dictionary<string, object>;
         if (gameData == null) return;
 
-        // --- Parse the state ---
+        // --- Parse state ---
         if (gameData.ContainsKey("state"))
         {
             string newStateString = gameData["state"].ToString();
             if (Enum.TryParse(newStateString, out GameState newGameState))
             {
-                // Let the host manage state transitions
                 SetGameState(newGameState);
             }
         }
@@ -166,29 +154,24 @@ public class GameManager : MonoBehaviour
             if (playersData != null)
             {
                 players.Clear();
-
                 foreach (var kvp in playersData)
                 {
-                    // kvp.Key is typically the player's ID
                     var playerDict = kvp.Value as Dictionary<string, object>;
                     if (playerDict == null) continue;
 
-                    string playerId = playerDict.ContainsKey("playerId") 
-                        ? playerDict["playerId"].ToString() 
+                    string playerId = playerDict.ContainsKey("playerId")
+                        ? playerDict["playerId"].ToString()
                         : kvp.Key;
-
-                    string playerName = playerDict.ContainsKey("playerName") 
-                        ? playerDict["playerName"].ToString() 
+                    string playerName = playerDict.ContainsKey("playerName")
+                        ? playerDict["playerName"].ToString()
                         : "Unknown";
 
-                    // Parse score
                     int score = 0;
                     if (playerDict.ContainsKey("score"))
                     {
                         int.TryParse(playerDict["score"].ToString(), out score);
                     }
 
-                    // Parse hasVoted
                     bool hasVoted = false;
                     if (playerDict.ContainsKey("hasVoted"))
                     {
@@ -201,7 +184,6 @@ public class GameManager : MonoBehaviour
                         HasVoted = hasVoted
                     };
                 }
-
                 UpdatePlayerSlots();
             }
         }
@@ -213,18 +195,17 @@ public class GameManager : MonoBehaviour
             if (answersData != null)
             {
                 currentAnswers.Clear();
-
                 foreach (var kvp in answersData)
                 {
                     var answerDict = kvp.Value as Dictionary<string, object>;
                     if (answerDict == null) continue;
 
                     string answerId = kvp.Key;
-                    string playerId = answerDict.ContainsKey("playerId") 
-                        ? answerDict["playerId"].ToString() 
+                    string playerId = answerDict.ContainsKey("playerId")
+                        ? answerDict["playerId"].ToString()
                         : "";
-                    string content = answerDict.ContainsKey("content") 
-                        ? answerDict["content"].ToString() 
+                    string content = answerDict.ContainsKey("content")
+                        ? answerDict["content"].ToString()
                         : "";
                     int votes = 0;
                     if (answerDict.ContainsKey("votes"))
@@ -245,32 +226,93 @@ public class GameManager : MonoBehaviour
 
     #region Game State / Rounds
 
+    private void SetInitialUI() {
+        titleLogo.SetActive(true);
+        playButton.SetActive(false);
+
+        gameCodeText.gameObject.SetActive(false);
+        promptText.gameObject.SetActive(false);
+        timerText.gameObject.SetActive(false);
+        qrCodeImage.gameObject.SetActive(false);
+        playerGrid.gameObject.SetActive(false);
+    }
+
     private void SetGameState(GameState newState)
     {
-        // If the state didn't actually change, do nothing
         if (currentState == newState) return;
-
         currentState = newState;
-        mainMenuPanel.SetActive(newState == GameState.PreGame);
-        lobbyPanel.SetActive(newState == GameState.Lobby);
-        gameplayPanel.SetActive(newState == GameState.SubmittingAnswers);
-        votingPanel.SetActive(newState == GameState.Voting);
-        resultsPanel.SetActive(newState == GameState.FinishedVoting);
 
         switch (newState)
         {
+            case GameState.PreGame:
+            Debug.Log("Disabling stuff");
+                // Only enable what we need for PreGame
+
+                break;
+
+            case GameState.Lobby:
+                // Show these
+                gameCodeText.gameObject.SetActive(true);
+                qrCodeImage.gameObject.SetActive(true);
+                playerGrid.gameObject.SetActive(true);
+
+                // Hide others
+                titleLogo.SetActive(true);
+                playButton.SetActive(false);
+                promptText.gameObject.SetActive(false);
+                timerText.gameObject.SetActive(false);
+                break;
+
             case GameState.SubmittingAnswers:
+                // Show prompt, timer, player grid
+                promptText.gameObject.SetActive(true);
+                timerText.gameObject.SetActive(true);
+                playerGrid.gameObject.SetActive(true);
+
+                // Hide others
+                titleLogo.SetActive(false);
+                playButton.SetActive(false);
+                gameCodeText.gameObject.SetActive(false);
+                qrCodeImage.gameObject.SetActive(false);
+
                 StartCoroutine(SubmittingAnswersPhase());
                 break;
+
             case GameState.Voting:
+                // Show timer, maybe keep player grid
+                timerText.gameObject.SetActive(true);
+                playerGrid.gameObject.SetActive(true);
+
+                // Hide others
+                titleLogo.SetActive(false);
+                playButton.SetActive(false);
+                promptText.gameObject.SetActive(false);
+                gameCodeText.gameObject.SetActive(false);
+                qrCodeImage.gameObject.SetActive(false);
+
                 StartCoroutine(VotingPhase());
                 break;
+
             case GameState.FinishedVoting:
+                // For the moment, we won’t show anything special; 
+                // but you could show results text or something
+
+                // Hide everything that doesn’t apply
+                promptText.gameObject.SetActive(false);
+                titleLogo.SetActive(false);
+                playButton.SetActive(false);
+                gameCodeText.gameObject.SetActive(false);
+                qrCodeImage.gameObject.SetActive(false);
+
+                // Timer & player grid might remain visible if you want to show results
+                timerText.gameObject.SetActive(false); // or true if you want a timer
+                playerGrid.gameObject.SetActive(true);
+
                 StartCoroutine(FinishedVotingPhase());
                 break;
         }
 
-        // Host updates Firebase "state" field so all clients see the new state
+        // Always push the new state to Firebase
         UpdateFirebaseState(newState);
     }
 
@@ -305,21 +347,15 @@ public class GameManager : MonoBehaviour
         {
             UpdatePlayerScore(topAnswer.PlayerId);
 
-            // Send the top voted answer to AI
-            if (awsInteractor != null)
-            {
-                awsInteractor.SendMessageToServer("Top voted answer: " + topAnswer.Content);
-            }
+            // Notify AI of the top voted answer
+            awsInteractor.SendMessageToServer("Top voted answer: " + topAnswer.Content);
         }
 
         yield return new WaitForSeconds(10f);
 
-        // Clear old answers for the next round
         currentAnswers.Clear();
-        // Also clear them in Firebase
         dbRootRef.Child("games").Child(gameCode).Child("answers").RemoveValueAsync();
 
-        // Move to the next round
         SetGameState(GameState.SubmittingAnswers);
     }
 
@@ -340,7 +376,6 @@ public class GameManager : MonoBehaviour
             player.Score += 10;
             UpdatePlayerUI(player);
 
-            // Also push score update to Firebase
             dbRootRef.Child("games")
                      .Child(gameCode)
                      .Child("players")
@@ -366,13 +401,11 @@ public class GameManager : MonoBehaviour
     private void UpdatePlayerSlots()
     {
         var playerArray = players.Values.ToArray();
-
         for (int i = 0; i < playerSlots.Length; i++)
         {
             if (i < playerArray.Length)
             {
-                var player = playerArray[i];
-                playerSlots[i].SetPlayer(player);
+                playerSlots[i].SetPlayer(playerArray[i]);
             }
             else
             {
@@ -383,8 +416,6 @@ public class GameManager : MonoBehaviour
 
     private void UpdatePlayerUI(Player player)
     {
-        // If you store a reference to Player in PlayerSlot,
-        // be sure it matches how your PlayerSlot is set up
         var slot = Array.Find(playerSlots, s => s.PlayerId == player.Id);
         if (slot != null)
         {
@@ -409,9 +440,10 @@ public class GameManager : MonoBehaviour
 
     private void GenerateQRCode()
     {
-        // Example only, implement your own QR code generation if desired
+        // If you want to generate & display a QR for your gameCode:
         // string url = $"https://your-game-url.com/join/{gameCode}";
-        // Set the generated texture to qrCodeImage
+        // ...
+        // qrCodeImage.texture = ...
     }
 
     #endregion
