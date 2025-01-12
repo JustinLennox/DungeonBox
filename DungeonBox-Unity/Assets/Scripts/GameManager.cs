@@ -370,7 +370,7 @@ public class GameManager : MonoBehaviour
                 answersGrid.gameObject.SetActive(true);
 
                 timerText.gameObject.SetActive(true);
-                playerGrid.gameObject.SetActive(true);
+                playerGrid.gameObject.SetActive(false);
 
                 titleLogo.SetActive(false);
                 playButton.SetActive(false);
@@ -392,7 +392,7 @@ public class GameManager : MonoBehaviour
                 gameCodeText.gameObject.SetActive(false);
                 qrCodeImage.gameObject.SetActive(false);
                 timerText.gameObject.SetActive(false);
-                playerGrid.gameObject.SetActive(true);
+                playerGrid.gameObject.SetActive(false);
 
                 // Show the final result (top vote)
                 topVoteSlot.gameObject.SetActive(true);

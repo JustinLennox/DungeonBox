@@ -59,6 +59,7 @@ export default function App() {
   const [playerId, setPlayerId] = useState(''); // persisted in AsyncStorage
   const [answerText, setAnswerText] = useState('');
   const [answers, setAnswers] = useState<any[]>([]);
+  const [hasVoted, setHasVoted] = useState<boolean>(false);
 
   // --------------------------------------------
   // On mount: get or create a consistent playerId,
@@ -240,6 +241,7 @@ export default function App() {
       votes: 0,
       playerName: tempPlayerName
     };
+    setHasVoted(false);
     await set(ref(db, `games/${roomCode}/answers/${newKey}`), answerData);
     setAnswerText('');
   };
@@ -249,14 +251,16 @@ export default function App() {
   // --------------------------------------------
   const voteOnAnswer = async (answerId: string) => {
     try {
+      setHasVoted(true);
       const votesRef = ref(db, `games/${roomCode}/answers/${answerId}/votes`);
       const snap = await get(votesRef);
       const currentVotes = snap.exists() ? snap.val() : 0;
       await set(votesRef, currentVotes + 1);
 
-      // Mark player as hasVoted if your logic requires it
+      // Mark player as hasVoted
       await update(ref(db, `games/${roomCode}/players/${playerId}`), { hasVoted: true });
     } catch (error) {
+      setHasVoted(false);
       console.log('Error voting:', error);
     }
   };
@@ -350,7 +354,7 @@ export default function App() {
                     return (
                       <View style={styles.answerItem}>
                         <Text>{item.content}</Text>
-                        {!isMyAnswer && (
+                        {(!isMyAnswer && !hasVoted) && (
                           <Button
                             title="Vote"
                             onPress={() => voteOnAnswer(item.id)}
