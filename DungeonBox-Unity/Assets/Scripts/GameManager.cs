@@ -25,6 +25,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private GameObject titleLogo;
     [SerializeField] private GameObject playButton;
     [SerializeField] private TMP_Text gameCodeText;
+    [SerializeField] private GameObject promptContainer;
     [SerializeField] private TMP_Text promptText;
     [SerializeField] private TMP_Text timerText;
     [SerializeField] private Image qrCodeImage;
@@ -311,6 +312,7 @@ public class GameManager : MonoBehaviour
 
         gameCodeText.gameObject.SetActive(false);
         promptText.gameObject.SetActive(false);
+        promptContainer.gameObject.SetActive(false);
         timerText.gameObject.SetActive(false);
         qrCodeImage.gameObject.SetActive(false);
         playerGrid.gameObject.SetActive(false);
@@ -342,12 +344,14 @@ public class GameManager : MonoBehaviour
                 titleLogo.SetActive(true);
                 playButton.SetActive(false);
                 promptText.gameObject.SetActive(false);
+                promptContainer.gameObject.SetActive(false);
                 timerText.gameObject.SetActive(false);
                 break;
 
             case GameState.SubmittingAnswers:
                 ClearOldAnswersAndResetVotes();
 
+                promptContainer.gameObject.SetActive(true);
                 promptText.text = awsInteractor.currentPrompt;
                 promptText.gameObject.SetActive(true);
                 timerText.gameObject.SetActive(true);
@@ -370,6 +374,7 @@ public class GameManager : MonoBehaviour
 
                 titleLogo.SetActive(false);
                 playButton.SetActive(false);
+                promptContainer.gameObject.SetActive(false);
                 promptText.gameObject.SetActive(false);
                 gameCodeText.gameObject.SetActive(false);
                 qrCodeImage.gameObject.SetActive(false);
@@ -380,6 +385,7 @@ public class GameManager : MonoBehaviour
                 break;
 
             case GameState.FinishedVoting:
+                promptContainer.gameObject.SetActive(false);
                 promptText.gameObject.SetActive(false);
                 titleLogo.SetActive(false);
                 playButton.SetActive(false);
