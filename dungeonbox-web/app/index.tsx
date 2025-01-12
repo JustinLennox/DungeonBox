@@ -56,7 +56,7 @@ export default function App() {
   const [currentGameState, setCurrentGameState] = useState<GameState>(GameState.PreGame);
 
   // Player info
-  const [playerId, setPlayerId] = useState('');     // Will be persisted in AsyncStorage
+  const [playerId, setPlayerId] = useState(''); // persisted in AsyncStorage
   const [answerText, setAnswerText] = useState('');
   const [answers, setAnswers] = useState<any[]>([]);
 
@@ -134,19 +134,16 @@ export default function App() {
     try {
       const storedCode = await AsyncStorage.getItem('roomCode');
       if (!storedCode) {
-        // Not in a room => remain PreGame
-        return;
+        return; // not in a room
       }
       // Check if the stored room is valid
       const snap = await get(child(ref(db), `games/${storedCode}`));
       if (!snap.exists()) {
-        // Not valid
         await clearLocalRoom();
         return;
       }
       const data = snap.val();
       if (data.state === GameState.GameOver) {
-        // Also not valid
         await clearLocalRoom();
         return;
       }
@@ -196,7 +193,7 @@ export default function App() {
 
       // Write this player into the players list
       const playerData = {
-        playerId,            // from state
+        playerId,            
         playerName: tempPlayerName,
         score: 0,
         hasVoted: false,
@@ -210,7 +207,7 @@ export default function App() {
   };
 
   // --------------------------------------------
-  // Start Game (sets startGame = true in player's record)
+  // Start Game
   // --------------------------------------------
   const startGame = async () => {
     if (!roomCode) return;
@@ -222,9 +219,16 @@ export default function App() {
   };
 
   // --------------------------------------------
-  // Submitting Answers
+  // Submit Answer
   // --------------------------------------------
   const submitAnswer = async () => {
+    // First check if user already has an answer
+    const submittedAnswer = answers.find(a => a.playerId === playerId);
+    if (submittedAnswer) {
+      alert(`You already submitted: "${submittedAnswer.content}"`);
+      return;
+    }
+
     if (!answerText.trim()) {
       alert('Please enter an answer');
       return;
@@ -240,7 +244,7 @@ export default function App() {
   };
 
   // --------------------------------------------
-  // Voting on an Answer
+  // Vote on an Answer
   // --------------------------------------------
   const voteOnAnswer = async (answerId: string) => {
     try {
@@ -269,27 +273,26 @@ export default function App() {
     );
   };
 
+  // In SubmittingAnswers state, check if user has an answer so we can display it
+  const submittedAnswer = answers.find(a => a.playerId === playerId);
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={{ padding: 20 }}>
-        {/* 1) Always show a small banner "DungeonBox" */}
+        {/* Always show banner */}
         <Text style={styles.banner}>DungeonBox</Text>
 
-        {/* If in a room, show the mini menu (leave, etc.) */}
         {!!roomCode && renderMenu()}
 
         {(!roomCode || currentGameState === GameState.PreGame) ? (
-          // ----------------------------------------
-          // PreGame / Not in a room
-          // ----------------------------------------
           <View style={{ marginTop: 16 }}>
             <Text style={styles.header}>Join a Room</Text>
 
             <Text>Enter Room Code:</Text>
             <TextInput
-              autoCapitalize={"characters"}
+              autoCapitalize="characters"
               style={styles.input}
-              onChangeText={(e) => { setTempRoomCode(e.substring(0, 4).toUpperCase()) }}
+              onChangeText={(val) => setTempRoomCode(val.substring(0, 4).toUpperCase())}
               value={tempRoomCode}
               placeholder="Room Code"
             />
@@ -305,11 +308,8 @@ export default function App() {
             <Button title="Join" onPress={joinRoom} />
           </View>
         ) : (
-          // ----------------------------------------
-          // In a room
-          // ----------------------------------------
           <View style={{ flex: 1 }}>
-            {/* 2) We do NOT display the room code now that we've joined */}
+            {/* Don't show room code once joined */}
             <Text style={styles.header}>State: {currentGameState}</Text>
 
             {currentGameState === GameState.Lobby && (
@@ -321,15 +321,23 @@ export default function App() {
 
             {currentGameState === GameState.SubmittingAnswers && (
               <View>
-                <Text>Submit Your Answer:</Text>
-                <TextInput
-                  style={styles.answerInput}
-                  maxLength={300}
-                  value={answerText}
-                  onChangeText={setAnswerText}
-                  placeholder="Type your answer..."
-                />
-                <Button title="Submit" onPress={submitAnswer} />
+                {submittedAnswer ? (
+                  <View>
+                    <Text>Your answer: {submittedAnswer.content}</Text>
+                  </View>
+                ) : (
+                  <>
+                    <Text>Submit Your Answer:</Text>
+                    <TextInput
+                      style={styles.answerInput}
+                      maxLength={300}
+                      value={answerText}
+                      onChangeText={setAnswerText}
+                      placeholder="Type your answer..."
+                    />
+                    <Button title="Submit" onPress={submitAnswer} />
+                  </>
+                )}
               </View>
             )}
 
@@ -361,7 +369,6 @@ export default function App() {
             {currentGameState === GameState.GameOver && (
               <View>
                 <Text>Game Over!</Text>
-                {/* Potentially show final scores */}
               </View>
             )}
           </View>
@@ -375,7 +382,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'white',
-    padding: 20,
   },
   banner: {
     fontSize: 20,
