@@ -1,0 +1,5 @@
+*.psd filter=lfs diff=lfs merge=lfs -text
+*.mp3 filter=lfs diff=lfs merge=lfs -text
+*.mov filter=lfs diff=lfs merge=lfs -text
+/Users/Justin/Projects/DungeonBox/DungeonBox-Unity/Assets/Assets/BackgroundVid.mov filter=lfs diff=lfs merge=lfs -text
+/Users/Justin/Projects/DungeonBox/DungeonBox-Unity/Assets/Assets/Copyright[[:space:]]Free[[:space:]]Fantasy[[:space:]]Tavern[[:space:]]Music.mp3 filter=lfs diff=lfs merge=lfs -text
