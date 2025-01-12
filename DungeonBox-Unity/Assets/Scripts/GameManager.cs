@@ -331,7 +331,7 @@ public class GameManager : MonoBehaviour
                 ClearOldAnswersAndResetVotes();
 
                 // 2) Setup UI
-                promptText.text = awsInteractor.currentPrompt; 
+                promptText.text = awsInteractor.currentPrompt;
                 promptText.gameObject.SetActive(true);
                 timerText.gameObject.SetActive(true);
                 playerGrid.gameObject.SetActive(true);
@@ -385,7 +385,7 @@ public class GameManager : MonoBehaviour
 
         // Clear from Firebase
         await dbRootRef.Child("games").Child(gameCode).Child("answers").RemoveValueAsync();
-        
+
         var playerList = players.ToList(); // snapshot
         // Reset each player's hasVoted = false
         foreach (var kvp in playerList)
@@ -400,17 +400,26 @@ public class GameManager : MonoBehaviour
                 .SetValueAsync(false);
         }
     }
-
     private IEnumerator SubmittingAnswersPhase()
     {
-        timer = 30f;
-        while (timer > 0)
+        timer = 60f;
+        // Keep running until either time runs out OR all players have submitted
+        while (timer > 0 && !AllPlayersSubmitted())
         {
             timer -= Time.deltaTime;
             timerText.text = $"Time remaining: {Mathf.CeilToInt(timer)}";
             yield return null;
         }
+
+        // Once time is up or all answers are in, transition to Voting
         SetGameState(GameState.Voting);
+    }
+
+    // Helper function that checks if each player has submitted exactly 1 answer
+    private bool AllPlayersSubmitted()
+    {
+        // For example, if each player can only submit once:
+        return currentAnswers.Count == players.Count;
     }
 
     private IEnumerator VotingPhase()
