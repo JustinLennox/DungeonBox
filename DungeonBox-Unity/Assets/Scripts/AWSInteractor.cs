@@ -19,6 +19,7 @@ public class AWSInteractor : MonoBehaviour {
 
     IEnumerator PostData(string message, string sessionId)
     {
+        Debug.Log("Sending message to AI: " + message);
         SendPostData sendPostData = new SendPostData();
         sendPostData.message = message;
         sendPostData.sessionId = sessionId;

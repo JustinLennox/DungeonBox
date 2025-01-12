@@ -203,7 +203,7 @@ export default function App() {
   const startGame = async () => {
     if (!roomCode) return;
     try {
-      await set(ref(db, `games/${roomCode}/state`), GameState.SubmittingAnswers);
+      await update(ref(db, `games/${roomCode}/players/${playerId}`), { startGame: true });
     } catch (error) {
       console.log('Error starting game:', error);
     }
