@@ -9,11 +9,10 @@ import {
   StyleSheet
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { v4 as uuidv4 } from 'uuid';
 
 // Firebase (Modular v9)
-import {
-  initializeApp
-} from 'firebase/app';
+import { initializeApp } from 'firebase/app';
 import {
   getDatabase,
   ref,
@@ -48,36 +47,46 @@ enum GameState {
 }
 
 export default function App() {
-  // **Separate** ephemeral typed text from the joined room code
-  const [tempRoomCode, setTempRoomCode] = useState<string>('');
-  const [tempPlayerName, setTempPlayerName] = useState<string>('');
+  // Ephemeral typed text from user
+  const [tempRoomCode, setTempRoomCode] = useState('');
+  const [tempPlayerName, setTempPlayerName] = useState('');
 
   // The actual joined room code (stored in local storage)
-  const [roomCode, setRoomCode] = useState<string>('');
+  const [roomCode, setRoomCode] = useState('');
   const [currentGameState, setCurrentGameState] = useState<GameState>(GameState.PreGame);
 
   // Player info
-  const [playerId, setPlayerId] = useState<string>('');
-  const [answerText, setAnswerText] = useState<string>('');
+  const [playerId, setPlayerId] = useState('');     // Will be persisted in AsyncStorage
+  const [answerText, setAnswerText] = useState('');
   const [answers, setAnswers] = useState<any[]>([]);
 
   // --------------------------------------------
-  // On mount, generate a random player ID and check local storage
+  // On mount: get or create a consistent playerId,
+  // then check local storage for existing room code
   // --------------------------------------------
   useEffect(() => {
     (async () => {
-      const randomId = 'player_' + Math.floor(Math.random() * 1000000);
-      setPlayerId(randomId);
+      // 1) Retrieve existing playerId if it exists
+      const storedPlayerId = await AsyncStorage.getItem('playerId');
+      if (storedPlayerId) {
+        setPlayerId(storedPlayerId);
+      } else {
+        // Create a new one
+        const newId = 'player_' + uuidv4();
+        setPlayerId(newId);
+        await AsyncStorage.setItem('playerId', newId);
+      }
+
+      // 2) Check if user was in a room
       await checkLocalRoomCode();
     })();
   }, []);
 
   // --------------------------------------------
-  // Whenever `roomCode` changes, set up a listener on that room
+  // Whenever `roomCode` changes, set up a listener
   // --------------------------------------------
   useEffect(() => {
     if (!roomCode) {
-      // If no room code, no listener => remain in PreGame
       setCurrentGameState(GameState.PreGame);
       return;
     }
@@ -125,20 +134,23 @@ export default function App() {
     try {
       const storedCode = await AsyncStorage.getItem('roomCode');
       if (!storedCode) {
-        return; // no code => remain in PreGame
+        // Not in a room => remain PreGame
+        return;
       }
-      // Check if the stored room is valid + not GameOver
+      // Check if the stored room is valid
       const snap = await get(child(ref(db), `games/${storedCode}`));
       if (!snap.exists()) {
+        // Not valid
         await clearLocalRoom();
         return;
       }
       const data = snap.val();
       if (data.state === GameState.GameOver) {
+        // Also not valid
         await clearLocalRoom();
         return;
       }
-      // If valid
+      // If valid, set local roomCode
       setRoomCode(storedCode);
     } catch (error) {
       console.log('Error checking local room:', error);
@@ -178,13 +190,13 @@ export default function App() {
         return;
       }
 
-      // If valid, store the code in local storage
+      // Store the code in local storage
       await AsyncStorage.setItem('roomCode', tempRoomCode);
       setRoomCode(tempRoomCode);
 
       // Write this player into the players list
       const playerData = {
-        playerId: playerId,
+        playerId,            // from state
         playerName: tempPlayerName,
         score: 0,
         hasVoted: false,
@@ -198,7 +210,7 @@ export default function App() {
   };
 
   // --------------------------------------------
-  // Start Game (Lobby -> SubmittingAnswers)
+  // Start Game (sets startGame = true in player's record)
   // --------------------------------------------
   const startGame = async () => {
     if (!roomCode) return;
@@ -217,8 +229,7 @@ export default function App() {
       alert('Please enter an answer');
       return;
     }
-    // Store under /answers
-    const newKey = playerId + '_' + Date.now();
+    const newKey = `${playerId}_${Date.now()}`;
     const answerData = {
       playerId,
       content: answerText.trim(),
@@ -239,117 +250,146 @@ export default function App() {
       await set(votesRef, currentVotes + 1);
 
       // Mark player as hasVoted if your logic requires it
-      const playerRef = ref(db, `games/${roomCode}/players/${playerId}`);
-      await update(playerRef, { hasVoted: true });
+      await update(ref(db, `games/${roomCode}/players/${playerId}`), { hasVoted: true });
     } catch (error) {
       console.log('Error voting:', error);
     }
   };
 
   // --------------------------------------------
-  // Render Logic
+  // UI
   // --------------------------------------------
 
-  // If we have NO joined room, or the game is over => Show PreGame screen
-  if (!roomCode || currentGameState === GameState.PreGame) {
+  // A small menu at the top-right or so. We'll just show a "Leave Game" button.
+  const renderMenu = () => {
     return (
-      <SafeAreaView style={styles.container}>
-        <Text style={styles.title}>Welcome to Dungeon Box!</Text>
-
-        <Text>Enter Room Code:</Text>
-        <TextInput
-          style={styles.input}
-          onChangeText={setTempRoomCode}
-          value={tempRoomCode}
-          placeholder="Room Code"
-        />
-
-        <Text>Enter Your Name:</Text>
-        <TextInput
-          style={styles.input}
-          onChangeText={setTempPlayerName}
-          value={tempPlayerName}
-          placeholder="Your Name"
-        />
-
-        <Button title="Join" onPress={joinRoom} />
-      </SafeAreaView>
+      <View style={styles.menuContainer}>
+        <Button title="Leave Game" onPress={clearLocalRoom} />
+      </View>
     );
-  }
+  };
 
-  // If we do have a joined room:
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Room: {roomCode}</Text>
-      <Text>State: {currentGameState}</Text>
+      <View style={{ padding: 20 }}>
+        {/* 1) Always show a small banner "DungeonBox" */}
+        <Text style={styles.banner}>DungeonBox</Text>
 
-      {currentGameState === GameState.Lobby && (
-        <View>
-          <Text>Waiting in the lobby...</Text>
-          {/* "Start Game" button here! */}
-          <Button title="Start Game" onPress={startGame} />
-        </View>
-      )}
+        {/* If in a room, show the mini menu (leave, etc.) */}
+        {!!roomCode && renderMenu()}
 
-      {currentGameState === GameState.SubmittingAnswers && (
-        <View>
-          <Text>Submit Your Answer:</Text>
-          <TextInput
-            style={styles.answerInput}
-            maxLength={300}
-            value={answerText}
-            onChangeText={setAnswerText}
-            placeholder="Type your answer..."
-          />
-          <Button title="Submit" onPress={submitAnswer} />
-        </View>
-      )}
+        {(!roomCode || currentGameState === GameState.PreGame) ? (
+          // ----------------------------------------
+          // PreGame / Not in a room
+          // ----------------------------------------
+          <View style={{ marginTop: 16 }}>
+            <Text style={styles.header}>Join a Room</Text>
 
-      {currentGameState === GameState.Voting && (
-        <View style={{ flex: 1 }}>
-          <Text>Vote on your favorite answer!</Text>
-          <FlatList
-            data={answers}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <View style={styles.answerItem}>
-                <Text>{item.content}</Text>
-                <Button
-                  title="Vote"
-                  onPress={() => voteOnAnswer(item.id)}
+            <Text>Enter Room Code:</Text>
+            <TextInput
+              autoCapitalize={"characters"}
+              style={styles.input}
+              onChangeText={(e) => { setTempRoomCode(e.substring(0, 4).toUpperCase()) }}
+              value={tempRoomCode}
+              placeholder="Room Code"
+            />
+
+            <Text>Enter Your Name:</Text>
+            <TextInput
+              style={styles.input}
+              onChangeText={setTempPlayerName}
+              value={tempPlayerName}
+              placeholder="Your Name"
+            />
+
+            <Button title="Join" onPress={joinRoom} />
+          </View>
+        ) : (
+          // ----------------------------------------
+          // In a room
+          // ----------------------------------------
+          <View style={{ flex: 1 }}>
+            {/* 2) We do NOT display the room code now that we've joined */}
+            <Text style={styles.header}>State: {currentGameState}</Text>
+
+            {currentGameState === GameState.Lobby && (
+              <View>
+                <Text>Waiting in the lobby...</Text>
+                <Button title="Start Game" onPress={startGame} />
+              </View>
+            )}
+
+            {currentGameState === GameState.SubmittingAnswers && (
+              <View>
+                <Text>Submit Your Answer:</Text>
+                <TextInput
+                  style={styles.answerInput}
+                  maxLength={300}
+                  value={answerText}
+                  onChangeText={setAnswerText}
+                  placeholder="Type your answer..."
+                />
+                <Button title="Submit" onPress={submitAnswer} />
+              </View>
+            )}
+
+            {currentGameState === GameState.Voting && (
+              <View style={{ flex: 1 }}>
+                <Text>Vote on your favorite answer!</Text>
+                <FlatList
+                  data={answers}
+                  keyExtractor={(item) => item.id}
+                  renderItem={({ item }) => (
+                    <View style={styles.answerItem}>
+                      <Text>{item.content}</Text>
+                      <Button
+                        title="Vote"
+                        onPress={() => voteOnAnswer(item.id)}
+                      />
+                    </View>
+                  )}
                 />
               </View>
             )}
-          />
-        </View>
-      )}
 
-      {currentGameState === GameState.FinishedVoting && (
-        <View>
-          <Text>Finished Voting! Please wait for the next round...</Text>
-        </View>
-      )}
+            {currentGameState === GameState.FinishedVoting && (
+              <View>
+                <Text>Finished Voting! Please wait for the next round...</Text>
+              </View>
+            )}
 
-      {currentGameState === GameState.GameOver && (
-        <View>
-          <Text>Game Over!</Text>
-          {/* Potentially show final scores */}
-        </View>
-      )}
+            {currentGameState === GameState.GameOver && (
+              <View>
+                <Text>Game Over!</Text>
+                {/* Potentially show final scores */}
+              </View>
+            )}
+          </View>
+        )}
+      </View>
     </SafeAreaView>
   );
 }
 
-// Some minimal styling
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: 'white',
+    padding: 20,
   },
-  title: {
-    fontSize: 22,
+  banner: {
+    fontSize: 20,
     fontWeight: 'bold',
+    alignSelf: 'center',
+    marginBottom: 8,
+  },
+  menuContainer: {
+    alignSelf: 'flex-end',
+    marginBottom: 8,
+  },
+  header: {
+    fontSize: 18,
+    fontWeight: '600',
     marginBottom: 12,
   },
   input: {

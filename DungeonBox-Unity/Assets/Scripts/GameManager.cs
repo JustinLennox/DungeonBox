@@ -60,7 +60,6 @@ public class GameManager : MonoBehaviour
             if (dependencyStatus == DependencyStatus.Available)
             {
                 InitializeFirebase();
-                // Unity decides the initial state, ignoring what’s in DB
                 SetGameState(GameState.PreGame);
             }
             else
@@ -68,6 +67,19 @@ public class GameManager : MonoBehaviour
                 Debug.LogError($"Could not resolve all Firebase dependencies: {dependencyStatus}");
             }
         });
+    }
+
+    /// <summary>
+    /// When the game or scene ends, clear out the room.
+    /// </summary>
+    private async void OnDestroy()
+    {
+        // If we have a valid gameCode, remove the entire node from Firebase
+        if (!string.IsNullOrEmpty(gameCode))
+        {
+            Debug.Log($"Clearing room {gameCode} from Firebase on destroy...");
+            await dbRootRef.Child("games").Child(gameCode).RemoveValueAsync();
+        }
     }
 
     private void InitializeFirebase()
@@ -85,14 +97,18 @@ public class GameManager : MonoBehaviour
         CreateGameSession();
     }
 
+    /// <summary>
+    /// Creates a new game session in Firebase, initializes a code, sets Lobby state.
+    /// </summary>
     private async void CreateGameSession()
     {
         try
         {
-            gameCode = GenerateGameCode();
+            // 1) Generate a room code that isn't taken yet
+            gameCode = await GenerateUniqueGameCode();
             gameCodeText.text = gameCode;
 
-            // Just store some minimal data for the new game
+            // 2) Create the game data in Firebase
             var newGameData = new Dictionary<string, object>
             {
                 { "gameCode", gameCode },
@@ -105,11 +121,11 @@ public class GameManager : MonoBehaviour
                 .Child(gameCode)
                 .SetValueAsync(newGameData);
 
-            // Unity alone sets the state:
+            // 3) Set local state to Lobby
             SetGameState(GameState.Lobby);
             GenerateQRCode();
 
-            // Start one real-time listener for players/answers, ignoring "state"
+            // 4) Start listener for players/answers
             SetupRealtimeListeners(gameCode);
         }
         catch (Exception e)
@@ -118,9 +134,27 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Checks if the generated code is already used in /games.
+    /// If it is, tries again until it finds an unused code.
+    /// </summary>
+    private async System.Threading.Tasks.Task<string> GenerateUniqueGameCode()
+    {
+        while (true)
+        {
+            string candidate = GenerateRandomCode();
+            var snapshot = await dbRootRef.Child("games").Child(candidate).GetValueAsync();
+            if (!snapshot.Exists)
+            {
+                // Code is free to use
+                return candidate;
+            }
+            // Otherwise loop again and generate a new code
+        }
+    }
+
     private void SetupRealtimeListeners(string code)
     {
-        // We'll watch /games/{code} for changes in players or answers
         FirebaseDatabase.DefaultInstance
             .GetReference("games")
             .Child(code)
@@ -134,9 +168,9 @@ public class GameManager : MonoBehaviour
         var gameData = args.Snapshot.Value as Dictionary<string, object>;
         if (gameData == null) return;
 
-        // We do NOT parse "gameData.state" at all here.
+        // We do NOT parse "gameData.state" at all here (Unity is the authority on state).
 
-        // --- Parse players
+        // --- Parse players ---
         if (gameData.ContainsKey("players"))
         {
             var playersData = gameData["players"] as Dictionary<string, object>;
@@ -168,14 +202,12 @@ public class GameManager : MonoBehaviour
                         bool.TryParse(playerDict["hasVoted"].ToString(), out hasVoted);
                     }
 
-                    // **New**: check for "startGame"
                     bool startGame = false;
                     if (playerDict.ContainsKey("startGame"))
                     {
                         bool.TryParse(playerDict["startGame"].ToString(), out startGame);
                     }
 
-                    // Create or update the local Player object
                     Player p = new Player(playerId, playerName)
                     {
                         Score = score,
@@ -188,15 +220,12 @@ public class GameManager : MonoBehaviour
 
                 UpdatePlayerSlots();
 
-                // Now that we have up-to-date player data:
                 // If we are in LOBBY, check if any player wants to "startGame"
                 if (currentState == GameState.Lobby)
                 {
                     bool anyStartGame = players.Values.Any(pl => pl.startGame == true);
                     if (anyStartGame)
                     {
-                        // We'll transition the game to SubmittingAnswers
-                        // and also set everyone’s startGame back to false
                         Debug.Log("Player requested startGame => moving to SubmittingAnswers");
                         SetGameState(GameState.SubmittingAnswers);
                         ClearStartGameFlags();
@@ -205,7 +234,7 @@ public class GameManager : MonoBehaviour
             }
         }
 
-        // --- Parse answers
+        // --- Parse answers ---
         if (gameData.ContainsKey("answers"))
         {
             var answersData = gameData["answers"] as Dictionary<string, object>;
@@ -243,10 +272,7 @@ public class GameManager : MonoBehaviour
 
     private async void ClearStartGameFlags()
     {
-        // Make a snapshot of the current dictionary
-        var playerList = players.ToList(); // each item is KeyValuePair<string, Player>
-
-        // Now iterate over the snapshot instead of the live 'players' dictionary
+        var playerList = players.ToList(); // snapshot
         foreach (var kvp in playerList)
         {
             string playerId = kvp.Key;
@@ -301,7 +327,11 @@ public class GameManager : MonoBehaviour
                 break;
 
             case GameState.SubmittingAnswers:
-                promptText.text = awsInteractor.currentPrompt;
+                // 1) Clear old answers & reset hasVoted
+                ClearOldAnswersAndResetVotes();
+
+                // 2) Setup UI
+                promptText.text = awsInteractor.currentPrompt; 
                 promptText.gameObject.SetActive(true);
                 timerText.gameObject.SetActive(true);
                 playerGrid.gameObject.SetActive(true);
@@ -311,6 +341,7 @@ public class GameManager : MonoBehaviour
                 gameCodeText.gameObject.SetActive(false);
                 qrCodeImage.gameObject.SetActive(false);
 
+                // 3) Start round
                 StartCoroutine(SubmittingAnswersPhase());
                 break;
 
@@ -340,8 +371,34 @@ public class GameManager : MonoBehaviour
                 break;
         }
 
-        // We DO still push the new state to Firebase so the web can see it
         UpdateFirebaseState(newState);
+    }
+
+    /// <summary>
+    /// Called immediately before we enter the SubmittingAnswers phase.
+    /// Clears previous answers and sets all players hasVoted=false in Firebase.
+    /// </summary>
+    private async void ClearOldAnswersAndResetVotes()
+    {
+        // Clear local list
+        currentAnswers.Clear();
+
+        // Clear from Firebase
+        await dbRootRef.Child("games").Child(gameCode).Child("answers").RemoveValueAsync();
+        
+        var playerList = players.ToList(); // snapshot
+        // Reset each player's hasVoted = false
+        foreach (var kvp in playerList)
+        {
+            kvp.Value.HasVoted = false;
+            var playerId = kvp.Key;
+            await dbRootRef.Child("games")
+                .Child(gameCode)
+                .Child("players")
+                .Child(playerId)
+                .Child("hasVoted")
+                .SetValueAsync(false);
+        }
     }
 
     private IEnumerator SubmittingAnswersPhase()
@@ -379,9 +436,7 @@ public class GameManager : MonoBehaviour
 
         yield return new WaitForSeconds(10f);
 
-        currentAnswers.Clear();
-        dbRootRef.Child("games").Child(gameCode).Child("answers").RemoveValueAsync();
-
+        // Move to next round
         SetGameState(GameState.SubmittingAnswers);
     }
 
@@ -413,7 +468,6 @@ public class GameManager : MonoBehaviour
 
     private async void UpdateFirebaseState(GameState state)
     {
-        // The Unity host remains the "authority."
         await dbRootRef
             .Child("games")
             .Child(gameCode)
@@ -454,7 +508,11 @@ public class GameManager : MonoBehaviour
 
     #region Utility
 
-    private string GenerateGameCode()
+    /// <summary>
+    /// Creates a short 4-letter code, but does NOT check if it's used.
+    /// We handle uniqueness in GenerateUniqueGameCode().
+    /// </summary>
+    private string GenerateRandomCode()
     {
         const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         char[] code = new char[4];
@@ -476,9 +534,6 @@ public class GameManager : MonoBehaviour
     #endregion
 }
 
-// -----------------------------------------
-// Updated Player model with `startGame`
-// -----------------------------------------
 [Serializable]
 public class Player
 {
