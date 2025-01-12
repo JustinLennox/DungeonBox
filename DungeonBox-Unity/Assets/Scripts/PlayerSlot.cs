@@ -6,11 +6,12 @@ using UnityEngine.UI;
 using System.Collections;
 using System.Text;
 using System;
+using TMPro;
 
 public class PlayerSlot : MonoBehaviour
 {
-    [SerializeField] private Text playerNameText;
-    [SerializeField] private Text scoreText;
+    [SerializeField] private TMP_Text playerNameText;
+    [SerializeField] private TMP_Text scoreText;
     [SerializeField] private Image statusIcon;
     [SerializeField] public string PlayerId;
 
@@ -18,7 +19,7 @@ public class PlayerSlot : MonoBehaviour
     {
         this.PlayerId = player.Id;
         this.playerNameText.text = player.Name;
-        this.scoreText.text = $"Score: {player.Score}";
+        this.scoreText.text = $"{player.Score}pts";
     }
 
     public void SetAnswerStatus(bool hasAnswered)

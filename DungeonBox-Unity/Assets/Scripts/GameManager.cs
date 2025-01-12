@@ -302,6 +302,8 @@ public class GameManager : MonoBehaviour
         timerText.gameObject.SetActive(false);
         qrCodeImage.gameObject.SetActive(false);
         playerGrid.gameObject.SetActive(false);
+
+        UpdatePlayerSlots();
     }
 
     private void SetGameState(GameState newState)
@@ -407,7 +409,7 @@ public class GameManager : MonoBehaviour
         while (timer > 0 && !AllPlayersSubmitted())
         {
             timer -= Time.deltaTime;
-            timerText.text = $"Time remaining: {Mathf.CeilToInt(timer)}";
+            timerText.text = $"{Mathf.CeilToInt(timer)}";
             yield return null;
         }
 
