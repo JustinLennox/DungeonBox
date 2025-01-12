@@ -385,8 +385,8 @@ public class GameManager : MonoBehaviour
                 break;
 
             case GameState.FinishedVoting:
-                promptContainer.gameObject.SetActive(false);
-                promptText.gameObject.SetActive(false);
+                promptContainer.gameObject.SetActive(true);
+                promptText.gameObject.SetActive(true);
                 titleLogo.SetActive(false);
                 playButton.SetActive(false);
                 gameCodeText.gameObject.SetActive(false);

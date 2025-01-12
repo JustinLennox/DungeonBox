@@ -32,8 +32,8 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 6478463759209779058}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0.34375003}
-  m_AnchorMax: {x: 1, y: 1}
+  m_AnchorMin: {x: 0.024, y: 0.34375003}
+  m_AnchorMax: {x: 0.98260874, y: 0.95217395}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -66,7 +66,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_text: ' The crazisest pthuansdlj asdj alskdj lakjds lkajsd lkjasdl kjasdl kjasdl
-    kasdl kjasdl kasdlk jasdlkj asdlkj'
+    kasdl kjasdl kasdlk jasdlkj asdlkj alkjd lkjasd lkjasd lkjasd lkajsd lkjasdlkjasd'
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 480ac858bd3094647b798852b9695b99, type: 2}
   m_sharedMaterial: {fileID: -9121625900670524054, guid: 480ac858bd3094647b798852b9695b99, type: 2}
@@ -93,7 +93,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 28.95
+  m_fontSize: 21.75
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -229,12 +229,12 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 40
+  m_fontSize: 60
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
   m_fontSizeMin: 12
-  m_fontSizeMax: 40
+  m_fontSizeMax: 60
   m_fontStyle: 1
   m_HorizontalAlignment: 2
   m_VerticalAlignment: 512
@@ -423,8 +423,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: 1
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 38c7d183f55564c19b9295e330062d05, type: 2}
-  m_sharedMaterial: {fileID: -8431156856927168034, guid: 38c7d183f55564c19b9295e330062d05, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 480ac858bd3094647b798852b9695b99, type: 2}
+  m_sharedMaterial: {fileID: -9121625900670524054, guid: 480ac858bd3094647b798852b9695b99, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -448,12 +448,12 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 40
+  m_fontSize: 60
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
   m_fontSizeMin: 12
-  m_fontSizeMax: 40
+  m_fontSizeMax: 60
   m_fontStyle: 1
   m_HorizontalAlignment: 2
   m_VerticalAlignment: 512
