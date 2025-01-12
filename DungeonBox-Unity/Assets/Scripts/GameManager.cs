@@ -424,7 +424,7 @@ public class GameManager : MonoBehaviour
         while (timer > 0 && !AllPlayersSubmitted())
         {
             timer -= Time.deltaTime;
-            timerText.text = $"Time: {Mathf.CeilToInt(timer)}";
+            timerText.text = $"{Mathf.CeilToInt(timer)}";
             yield return null;
         }
         SetGameState(GameState.Voting);
@@ -441,7 +441,7 @@ public class GameManager : MonoBehaviour
         while (timer > 0 && !AllPlayersVoted())
         {
             timer -= Time.deltaTime;
-            timerText.text = $"Time remaining: {Mathf.CeilToInt(timer)}";
+            timerText.text = $"{Mathf.CeilToInt(timer)}";
             yield return null;
         }
         SetGameState(GameState.FinishedVoting);
