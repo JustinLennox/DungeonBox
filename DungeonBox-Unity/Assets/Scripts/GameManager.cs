@@ -265,6 +265,7 @@ public class GameManager : MonoBehaviour
 
             case GameState.SubmittingAnswers:
                 // Show prompt, timer, player grid
+                promptText.text = this.awsInteractor.currentPrompt;
                 promptText.gameObject.SetActive(true);
                 timerText.gameObject.SetActive(true);
                 playerGrid.gameObject.SetActive(true);
@@ -348,7 +349,7 @@ public class GameManager : MonoBehaviour
             UpdatePlayerScore(topAnswer.PlayerId);
 
             // Notify AI of the top voted answer
-            awsInteractor.SendMessageToServer("Top voted answer: " + topAnswer.Content);
+            awsInteractor.SendMessageToServer(topAnswer.Content);
         }
 
         yield return new WaitForSeconds(10f);

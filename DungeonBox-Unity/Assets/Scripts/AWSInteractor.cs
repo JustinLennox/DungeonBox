@@ -9,8 +9,11 @@ using System;
 public class AWSInteractor : MonoBehaviour {
     public string sessionId = "";
 
+    public string currentPrompt = "";
+
     public void SendMessageToServer(string message)
     {    
+        this.currentPrompt = "";
         StartCoroutine(PostData(message, this.sessionId));
     }
 
@@ -34,6 +37,11 @@ public class AWSInteractor : MonoBehaviour {
             BedrockResponse bedrockResponse = JsonUtility.FromJson<BedrockResponse>(resultPostData.body);
             Debug.Log("Response: " + bedrockResponse.response);
              Debug.Log("Session ID: " + bedrockResponse.sessionId);
+
+             if (bedrockResponse.response != null)
+            {
+                this.currentPrompt = bedrockResponse.response;
+            }
         
              if (bedrockResponse.sessionId != null)
             {
